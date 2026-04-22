@@ -1,311 +1,284 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import time
 
-# ==========================================
-# 1. KONFIGURASI HALAMAN & THEME
-# ==========================================
+# =================================================================
+# 1. KONFIGURASI HALAMAN & STATE MANAGEMENT
+# =================================================================
 st.set_page_config(
-    page_title="Rumah Sunat Anak | Modern & Nyaman", 
+    page_title="Rumah Sunat Anak | Pusat Khitan Modern", 
     page_icon="🌙", 
     layout="wide"
 )
 
-# ==========================================
-# 2. INISIALISASI SESSION STATE
-# ==========================================
-# Menyimpan data agar tidak hilang saat pindah menu
+# Inisialisasi Session State agar data sinkron antar menu
 if 'kuota_massal_total' not in st.session_state:
     st.session_state.kuota_massal_total = 50
 if 'terdaftar_massal' not in st.session_state:
-    st.session_state.terdaftar_massal = 12
+    st.session_state.terdaftar_massal = 18
 if 'kuota_reguler' not in st.session_state:
-    st.session_state.kuota_reguler = 8
+    st.session_state.kuota_reguler = 12
 if 'rekomendasi_metode' not in st.session_state:
     st.session_state.rekomendasi_metode = "Khitan Reguler"
+if 'last_submit' not in st.session_state:
+    st.session_state.last_submit = None
 
-# ==========================================
-# 3. CSS KUSTOM (STYLING)
-# ==========================================
+# =================================================================
+# 2. CUSTOM CSS (TEMA HIJAU SAGE & TEKS HITAM)
+# =================================================================
 st.markdown("""
     <style>
-    /* Background Utama Hijau Sage */
+    /* Background Utama */
     .stApp { background-color: #B2AC88; } 
     
-    /* Judul Besar: Putih dengan Outline Hitam */
+    /* Judul Utama dengan Outline */
     .header-style {
-        color: white; 
-        text-align: center; 
-        font-size: 55px; 
-        font-weight: bold;
-        text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
-        font-family: 'Verdana', sans-serif;
-        margin-bottom: 5px;
+        color: white; text-align: center; font-size: 60px; font-weight: bold;
+        text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000;
+        font-family: 'Verdana', sans-serif; margin-bottom: 0px;
     }
     
-    .subheader-style {
-        color: white;
-        font-size: 32px;
-        font-weight: bold;
-        text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-        margin-bottom: 20px;
+    .slogan-style {
+        color: #1A2E25; text-align: center; font-style: italic; font-size: 18px;
+        font-weight: bold; margin-bottom: 30px;
     }
 
-    /* Box Output: Putih Gading agar Teks Hitam Jelas */
-    .result-box {
-        background-color: #F7F9F2; 
-        padding: 30px; 
-        border-radius: 20px; 
-        border: 4px solid #2E473B;
-        margin-top: 20px;
-        box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+    .subheader-style {
+        color: white; font-size: 35px; font-weight: bold;
+        text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        margin-bottom: 25px; border-left: 10px solid #2E473B; padding-left: 15px;
     }
-    
-    /* Memaksa Teks Hitam di Dalam Box & Tabel */
+
+    /* Box Output Card - Teks Hitam Pekat */
+    .result-box {
+        background-color: #F7F9F2; padding: 35px; border-radius: 25px; 
+        border: 5px solid #2E473B; margin-top: 20px;
+        box-shadow: 10px 10px 20px rgba(0,0,0,0.15);
+    }
     .result-box h3, .result-box p, .result-box b, .result-box li, .stTable td, .stTable th {
         color: #000000 !important;
     }
 
-    /* Sidebar Custom */
-    [data-testid="stSidebar"] { background-color: #2E473B; border-right: 2px solid #E0E5D9; }
+    /* Sidebar & Navigation */
+    [data-testid="stSidebar"] { background-color: #2E473B; border-right: 3px solid #E0E5D9; }
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] h2 { color: #E0E5D9 !important; }
     
-    /* Input Form */
-    input, select, [data-baseweb="select"] {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
+    /* Input Styling */
+    label { color: white !important; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+    .stButton>button {
+        background-color: #2E473B !important; color: white !important;
+        border-radius: 10px; font-weight: bold; width: 100%; height: 50px;
     }
-    label { color: white !important; font-weight: bold; text-shadow: 1px 1px 1px #000; }
-    
-    /* Styling Tabel */
-    .stTable { background-color: #F7F9F2 !important; border-radius: 15px; overflow: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 4. DATA MASTER (DOKTER & LAYANAN)
-# ==========================================
-data_dokter_lengkap = {
-    "Khitan Reguler": {"dokter": "dr. Ahmad Subarjo", "spesialis": "Khitan Anak & Dewasa"},
-    "Khitan Metode Klem": {"dokter": "dr. Hilman Syah", "spesialis": "Ahli Power Clamp"},
-    "Khitan Metode Stapler": {"dokter": "dr. Yusuf Mansur", "spesialis": "Estetika Stapler ZSR"},
-    "Khitan Gemuk (Spesialis)": {"dokter": "dr. Zulkifli, Sp.B", "spesialis": "Bedah Umum & Pediatrik"},
-    "Khitan Laser": {"dokter": "dr. Faisal Anwar", "spesialis": "Cauter Expert"},
-    "Khitan Urologi": {"dokter": "dr. Ridwan Hakim, Sp.U", "spesialis": "Spesialis Urologi"},
-    "Khitan Bayi": {"dokter": "dr. Siti Aminah", "spesialis": "Manajemen Trauma Bayi"},
-    "Khitan Tanpa Jarum Suntik": {"dokter": "dr. Budi Santoso", "spesialis": "Ahli Bius Needle-Free"}
+# =================================================================
+# 3. DATA MASTER (DOKTER & ORGANISASI)
+# =================================================================
+data_dokter_db = [
+    {"Nama": "dr. Ahmad Subarjo", "Keahlian": "Kepala Klinik & Ahli Klem"},
+    {"Nama": "dr. Zulkifli, Sp.B", "Keahlian": "Spesialis Bedah Umum"},
+    {"Nama": "dr. Hilman Syah", "Keahlian": "Dokter Pelaksana Senior"},
+    {"Nama": "dr. Yusuf Mansur", "Keahlian": "Spesialis Stapler Estetik"},
+    {"Nama": "dr. Ridwan Hakim, Sp.U", "Keahlian": "Konsultan Urologi"},
+    {"Nama": "dr. Faisal Anwar", "Keahlian": "Spesialis Sunat Gemuk"},
+    {"Nama": "dr. Siti Aminah", "Keahlian": "Kepala Perawat & Nyeri"},
+    {"Nama": "dr. Budi Santoso", "Keahlian": "Ahli Bius Tanpa Jarum"}
+]
+
+data_organisasi = {
+    "Level Eksekutif": [
+        {"Jabatan": "Direktur Utama", "Nama": "H. Salim Wijaya, M.M"},
+        {"Jabatan": "Wakil Direktur Medis", "Nama": "dr. Ahmad Subarjo"}
+    ],
+    "Manajemen Operasional": [
+        {"Jabatan": "Manajer Operasional", "Nama": "Rina Kartika, S.E"},
+        {"Jabatan": "Manajer Keuangan", "Nama": "Anita Sari, Ak."},
+        {"Jabatan": "Humas & Kemitraan", "Nama": "Bambang Pamungkas"}
+    ],
+    "Penunjang Medis": [
+        {"Jabatan": "Kepala Farmasi", "Nama": "Apt. Linda Mayasari"},
+        {"Jabatan": "IT Support & Digital", "Nama": "Eko Prasetyo, S.Kom"},
+        {"Jabatan": "Manajemen Fasilitas", "Nama": "Doni Setiawan"}
+    ]
 }
 
-# ==========================================
-# 5. SIDEBAR NAVIGASI
-# ==========================================
+# =================================================================
+# 4. SIDEBAR NAVIGASI
+# =================================================================
 with st.sidebar:
-    st.markdown("<h2 style='text-align: center;'>MENU KLINIK 🌙</h2>", unsafe_allow_html=True)
-    menu = st.radio("Pilih Menu:", [
-        "🏠 Beranda", 
-        "📊 Cek Kuota Real-Time", 
+    st.markdown("<h2 style='text-align: center;'>MENU UTAMA 🌙</h2>", unsafe_allow_html=True)
+    menu = st.radio("Pilih Layanan:", [
+        "🏠 Beranda Utama", 
         "📐 Kalkulator Metode Smart", 
         "📝 Pendaftaran Digital", 
-        "💊 Panduan Pasca-Khitan", 
-        "🏢 Profil Rumah Sunat"
+        "📊 Monitoring Kuota", 
+        "💊 Panduan Pasca-Tindakan",
+        "🏢 Profil & Struktur RS"
     ])
     st.divider()
-    st.info("Buka 24 Jam untuk Konsultasi Darurat Pasca-Khitan.")
+    st.sidebar.warning("Layanan IGD Khitan buka 24/7.")
 
-# HEADER UTAMA (Selalu Muncul)
+# Header Global
 st.markdown("<h1 class='header-style'>RUMAH SUNAT ANAK</h1>", unsafe_allow_html=True)
+st.markdown("<p class='slogan-style'>\"Kesucian (fitrah) itu ada lima: Khitan...\" (HR. Bukhari & Muslim)</p>", unsafe_allow_html=True)
 
-# ==========================================
-# 6. LOGIKA SETIAP FITUR
-# ==========================================
+# =================================================================
+# 5. IMPLEMENTASI FITUR
+# =================================================================
 
 # --- MENU: BERANDA ---
-if menu == "🏠 Beranda":
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("""
-        <div style='text-align: center;'>
-            <h2 style='color: white; text-shadow: 1px 1px 2px #000;'>Solusi Khitan Modern, Aman & Nyaman</h2>
-            <p style='font-size: 20px; color: #1A2E25; font-style: italic; font-weight: bold;'>
-                "Kesucian (fitrah) itu ada lima: Khitan, mencukur bulu kemaluan, mencabut bulu ketiak, memotong kuku, dan mencukur kumis." 
-                <br><b>(HR. Bukhari & Muslim)</b>
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 1, 1])
+if menu == "🏠 Beranda Utama":
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # Foto Dokter Laki-laki
         st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", use_container_width=True)
-
-    st.markdown("""
-        <div style='text-align: center; margin-top: 20px; background: rgba(255,255,255,0.2); padding: 20px; border-radius: 15px;'>
-            <p style='font-size: 18px; color: #1A2E25; font-weight: 500;'>
-                Selamat datang di pusat pelayanan khitan terbaik. Kami menggabungkan pendekatan <b>psikologis anak</b> 
-                dengan <b>teknologi medis terbaru</b> untuk memberikan pengalaman berharga sekali seumur hidup yang tanpa trauma.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- MENU: CEK KUOTA ---
-elif menu == "📊 Cek Kuota Real-Time":
-    st.markdown("<h2 class='subheader-style'>Status Ketersediaan Kuota 📊</h2>", unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Kuota Khitan Massal (Libur Sekolah)", f"{st.session_state.terdaftar_massal}/{st.session_state.kuota_massal_total}", "+3 Pasien Baru")
-    with col2:
-        st.metric("Sisa Antrean Reguler Hari Ini", f"{st.session_state.kuota_reguler} Kursi", "Tersedia")
-    
-    st.write("### Grafik Keterisian Kuota")
-    persen = int((st.session_state.terdaftar_massal / st.session_state.kuota_massal_total) * 100)
-    st.progress(persen)
-    st.caption(f"Sudah terisi {persen}% dari total kapasitas sunat massal bulan Juni.")
-
-# --- MENU: KALKULATOR METODE (SINKRON KE DAFTAR) ---
-elif menu == "📐 Kalkulator Metode Smart":
-    st.markdown("<h2 class='subheader-style'>Smart Method Selector 📐</h2>", unsafe_allow_html=True)
-    st.write("Gunakan fitur ini untuk menentukan paket terbaik bagi buah hati Anda.")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        usia = st.number_input("Usia Anak (Tahun)", 0, 18, 7)
-        kondisi = st.selectbox("Kondisi Fisik Anak", ["Normal", "Gemuk (Micro Penis)", "Phimosis (Perlekatan)"])
-    with col2:
-        aktif = st.select_slider("Tingkat Aktivitas", options=["Sangat Tenang", "Normal", "Sangat Aktif"])
-        keinginan = st.selectbox("Prioritas Hasil", ["Tanpa Jahitan", "Bisa Langsung Mandi", "Estetika Sempurna"])
-
-    if st.button("Dapatkan Rekomendasi Medis ✨"):
-        # Logika Penentuan
-        if kondisi == "Gemuk (Micro Penis)":
-            st.session_state.rekomendasi_metode = "Khitan Gemuk (Spesialis)"
-            penjelasan = "Dibutuhkan teknik khusus bedah minor untuk hasil fungsional yang optimal."
-        elif aktif == "Sangat Aktif" or keinginan == "Bisa Langsung Mandi":
-            st.session_state.rekomendasi_metode = "Khitan Metode Klem"
-            penjelasan = "Menggunakan alat klem yang melindungi luka sehingga anak bebas bergerak dan mandi."
-        elif usia > 11 or keinginan == "Estetika Sempurna":
-            st.session_state.rekomendasi_metode = "Khitan Metode Stapler"
-            penjelasan = "Teknologi terbaru sekali pakai yang memberikan hasil sangat rapi tanpa jahitan manual."
-        else:
-            st.session_state.rekomendasi_metode = "Khitan Reguler"
-            penjelasan = "Metode laser cauter yang efisien dan ekonomis untuk anak usia sekolah."
-            
-        st.markdown(f"""
-            <div class="result-box">
-                <h3>Rekomendasi Utama: {st.session_state.rekomendasi_metode}</h3>
-                <p><b>Analisis Dokter:</b> {penjelasan}</p>
-                <hr>
-                <p><i>Hasil ini telah disimpan. Silahkan langsung menuju menu <b>Pendaftaran Digital</b> untuk memesan jadwal.</i></p>
+        st.markdown("<h2 style='text-align:center; color:white;'>Selamat Datang</h2>", unsafe_allow_html=True)
+        st.write("""
+            <div style='text-align: center; color: #1A2E25; font-weight: 500; font-size: 1.1em;'>
+                Kami menyediakan layanan khitan modern dengan pendekatan psikologis anak yang ramah dan aman. 
+                Nikmati fasilitas ruang tindakan bertema dan teknologi terbaru tanpa jahitan.
             </div>
         """, unsafe_allow_html=True)
 
-# --- MENU: PENDAFTARAN (AUTO-SYNC) ---
-elif menu == "📝 Pendaftaran Digital":
-    st.markdown("<h2 class='subheader-style'>Formulir Pendaftaran Pasien 📝</h2>", unsafe_allow_html=True)
+# --- MENU: KALKULATOR (SINKRON KE DAFTAR) ---
+elif menu == "📐 Kalkulator Metode Smart":
+    st.markdown("<h2 class='subheader-style'>Smart Method Selector 📐</h2>", unsafe_allow_html=True)
     
-    # Sinkronisasi Otomatis dengan Kalkulator
-    list_metode = list(data_dokter_lengkap.keys())
-    idx_default = list_metode.index(st.session_state.rekomendasi_metode)
-    
-    with st.form("pendaftaran_form"):
-        st.write("### Data Pasien & Jadwal")
+    with st.container():
         c1, c2 = st.columns(2)
         with c1:
-            nama = st.text_input("Nama Lengkap Anak")
-            ortu = st.text_input("Nama Orang Tua / Wali")
+            usia_k = st.number_input("Berapa usia anak saat ini?", 0, 18, 7)
+            kondisi_k = st.selectbox("Kondisi Fisik Khusus?", ["Normal", "Gemuk", "Phimosis"])
         with c2:
-            layanan = st.selectbox("Jenis Layanan", ["Reguler (Berbayar)", "Massal (Promo/Gratis)"])
-            tgl = st.date_input("Rencana Tanggal", min_value=datetime.now())
+            aktif_k = st.select_slider("Tingkat Aktivitas Anak", options=["Tenang", "Normal", "Sangat Aktif"])
+            prioritas = st.selectbox("Apa prioritas Anda?", ["Hasil Estetik", "Bisa Mandi Langsung", "Ekonomis"])
+
+    if st.button("Analisis Rekomendasi Medis ✨"):
+        with st.spinner("Menganalisis data..."):
+            time.sleep(1)
+            # Logika Pemilihan
+            if kondisi_k == "Gemuk":
+                st.session_state.rekomendasi_metode = "Khitan Gemuk (Spesialis)"
+                hasil_txt = "Memerlukan teknik bedah minor khusus untuk hasil maksimal."
+            elif aktif_k == "Sangat Aktif" or prioritas == "Bisa Mandi Langsung":
+                st.session_state.rekomendasi_metode = "Khitan Metode Klem"
+                hasil_txt = "Alat klem melindungi luka, anak bisa langsung sekolah dan mandi."
+            elif usia_k > 10 or prioritas == "Hasil Estetik":
+                st.session_state.rekomendasi_metode = "Khitan Metode Stapler"
+                hasil_txt = "Teknologi sekali pakai, hasil sangat rapi dan penyembuhan cepat."
+            else:
+                st.session_state.rekomendasi_metode = "Khitan Reguler"
+                hasil_txt = "Metode laser cauter standar yang aman dan terjangkau."
+            
+            st.markdown(f"""
+                <div class="result-box">
+                    <h3>Metode Disarankan: {st.session_state.rekomendasi_metode}</h3>
+                    <p><b>Catatan Medis:</b> {hasil_txt}</p>
+                    <p><i>Data ini telah diteruskan ke bagian Pendaftaran.</i></p>
+                </div>
+            """, unsafe_allow_html=True)
+
+# --- MENU: PENDAFTARAN (AUTO-FILL) ---
+elif menu == "📝 Pendaftaran Digital":
+    st.markdown("<h2 class='subheader-style'>Pendaftaran Pasien Baru 📝</h2>", unsafe_allow_html=True)
+    
+    metode_opt = [d['Nama'] for d in data_dokter_db] # Error handling: data_dokter_db keys
+    # Map rekomendasi ke list pilihan formulir
+    map_metode = {
+        "Khitan Reguler": 0, "Khitan Metode Klem": 2, 
+        "Khitan Metode Stapler": 3, "Khitan Gemuk (Spesialis)": 5
+    }
+    default_idx = map_metode.get(st.session_state.rekomendasi_metode, 0)
+
+    with st.form("form_daftar"):
+        c1, c2 = st.columns(2)
+        with c1:
+            nama_p = st.text_input("Nama Lengkap Anak")
+            tgl_p = st.date_input("Rencana Tanggal Tindakan")
+        with c2:
+            ortu_p = st.text_input("Nama Orang Tua")
+            layanan_p = st.selectbox("Kategori Layanan", ["Reguler/Privat", "Massal/Promo"])
+        
+        # SINKRONISASI OTOMATIS
+        paket_p = st.selectbox("Paket Metode (Sesuai Rekomendasi Kalkulator)", 
+                               ["Khitan Reguler", "Khitan Laser", "Khitan Metode Klem", "Khitan Metode Stapler", "Khitan Urologi", "Khitan Gemuk (Spesialis)"],
+                               index=default_idx)
         
         st.divider()
-        st.write("### Pilihan Paket")
-        # Field ini terisi otomatis dari hasil kalkulator tadi
-        paket = st.selectbox("Metode Khitan (Rekomendasi Terpilih)", list_metode, index=idx_default)
-        
-        pesan = st.text_area("Catatan Tambahan (Riwayat Alergi, dll)")
-        konfirmasi = st.checkbox("Saya setuju dengan syarat dan ketentuan tindakan medis.")
-        
-        if st.form_submit_button("SUBMIT PENDAFTARAN ✨"):
-            if not nama or not konfirmasi:
-                st.error("Mohon isi nama dan setujui konfirmasi.")
-            else:
-                # EFEK BINTANG MELAYANG (Snow)
-                st.snow()
-                
-                # Update Kuota
-                if layanan == "Reguler (Berbayar)": st.session_state.kuota_reguler -= 1
+        if st.form_submit_button("KONFIRMASI PENDAFTARAN ✨"):
+            if nama_p:
+                st.balloons() # EFEK VISUAL BALON
+                if layanan_p == "Reguler/Privat": st.session_state.kuota_reguler -= 1
                 else: st.session_state.terdaftar_massal += 1
                 
                 st.markdown(f"""
                     <div class="result-box">
-                        <h3>✅ Pendaftaran Berhasil Disimpan!</h3>
-                        <p><b>No. Antrean:</b> RSA-{datetime.now().strftime('%y%m%d')}-09</p>
-                        <p><b>Nama Anak:</b> {nama}</p>
-                        <p><b>Paket:</b> {paket}</p>
-                        <p><b>Dokter PJ:</b> {data_dokter_lengkap[paket]['dokter']}</p>
-                        <p><b>Tanggal Kedatangan:</b> {tgl.strftime('%d %B %Y')}</p>
-                        <hr>
-                        <p>Silahkan screenshot halaman ini dan tunjukkan ke resepsionis saat kedatangan.</p>
+                        <h3>✅ Pendaftaran Berhasil!</h3>
+                        <p><b>Nama:</b> {nama_p} | <b>Paket:</b> {paket_p}</p>
+                        <p>Silahkan datang pada {tgl_p.strftime('%d %m %Y')} jam 08:00 WIB.</p>
                     </div>
                 """, unsafe_allow_html=True)
 
+# --- MENU: MONITORING KUOTA ---
+elif menu == "📊 Monitoring Kuota":
+    st.markdown("<h2 class='subheader-style'>Cek Ketersediaan Kuota 📊</h2>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Pendaftar Sunat Massal", f"{st.session_state.terdaftar_massal}/50", "Terisi")
+    with col2:
+        st.metric("Sisa Slot Reguler Hari Ini", f"{st.session_state.kuota_reguler}", "Tersedia")
+    st.progress(int((st.session_state.terdaftar_massal / 50) * 100))
+
+# --- MENU: PROFIL & STRUKTUR (EKSPANSI BESAR) ---
+elif menu == "🏢 Profil & Struktur RS":
+    st.markdown("<h2 class='subheader-style'>Mengenal Rumah Sunat Anak 🏢</h2>", unsafe_allow_html=True)
+    
+    # 1. Narasi Profil Panjang
+    st.markdown("""
+        <div class="result-box">
+            <h3>Sejarah & Filosofi</h3>
+            <p>Didirikan pada 15 April 2015, <b>Rumah Sunat Anak</b> bermula dari visi dr. Ahmad Subarjo untuk menghadirkan layanan khitan yang manusiawi. Kami percaya bahwa pengalaman khitan yang positif akan membangun rasa percaya diri pada anak. Dengan filosofi <i>"Modern, Syar'i, & Nyaman"</i>, kami mengintegrasikan standar sterilitas rumah sakit dengan kenyamanan layaknya di rumah sendiri.</p>
+            <p>Hingga tahun 2026, kami telah mengoperasikan 5 cabang di seluruh Indonesia dan mengkhitan lebih dari 20.000 anak. Kami terus berinovasi dengan alat-alat disposabel (sekali pakai) untuk menjamin keamanan 100% bagi setiap pasien.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 2. Layout Kolom: List Dokter di Kiri
+    col_kiri, col_kanan = st.columns([1, 2])
+    
+    with col_kiri:
+        st.markdown("<h3 style='color:white;'>📋 Tim Dokter Spesialis</h3>", unsafe_allow_html=True)
+        st.table(pd.DataFrame(data_dokter_db))
+        st.info("Seluruh dokter kami telah tersertifikasi oleh Perhimpunan Khitan Indonesia.")
+
+    with col_kanan:
+        st.markdown("<h3 style='color:white;'>🏆 Visi & Keunggulan</h3>", unsafe_allow_html=True)
+        st.markdown("""
+            <div class="result-box" style="margin-top:0px;">
+                <ul>
+                    <li><b>Visi:</b> Menjadi pusat khitan modern referensi nasional tahun 2030.</li>
+                    <li><b>Keunggulan 1:</b> Tanpa Jarum Suntik (Teknologi Needle-Free Injection).</li>
+                    <li><b>Keunggulan 2:</b> Tanpa Jahit & Tanpa Perban (Metode Klem & Stapler).</li>
+                    <li><b>Keunggulan 3:</b> Kontrol pasca-khitan gratis hingga sembuh total.</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # 3. Struktur Organisasi Luas (Di Bawah Profil)
+    st.markdown("<h3 style='color:white;'>🏛️ Struktur Organisasi & Manajemen</h3>", unsafe_allow_html=True)
+    
+    for div_name, div_data in data_organisasi.items():
+        with st.expander(f"Buka Detail: {div_name}"):
+            st.table(pd.DataFrame(div_data))
+
 # --- MENU: PANDUAN ---
-elif menu == "💊 Panduan Pasca-Khitan":
-    st.markdown("<h2 class='subheader-style'>Panduan Perawatan & Pemulihan 💊</h2>", unsafe_allow_html=True)
+elif menu == "💊 Panduan Pasca-Tindakan":
+    st.markdown("<h2 class='subheader-style'>Post-Op Care Guide 💊</h2>", unsafe_allow_html=True)
+    opsi_p = st.radio("Fase Penyembuhan:", ["24 Jam Pertama", "Hari 2 - 5", "Hari 7+ (Kontrol)"])
     
-    fase = st.radio("Pilih Fase Pemulihan:", ["24 Jam Pertama (Kritis)", "Hari ke 2-5 (Penyembuhan)", "Hari ke 7+ (Pelepasan Alat)"])
-    
-    if fase == "24 Jam Pertama (Kritis)":
-        st.markdown("""<div class="result-box">
-            <h3>🛡️ Penanganan Awal</h3>
-            <ul>
-                <li>Berikan obat anti-nyeri tepat waktu setiap 4-6 jam.</li>
-                <li>Gunakan celana sunat (batok) agar luka tidak tergesek.</li>
-                <li>Jika terjadi rembesan darah sedikit, tekan perlahan dengan kassa steril.</li>
-                <li>Pastikan anak tetap terhidrasi dengan baik.</li>
-            </ul>
-        </div>""", unsafe_allow_html=True)
-    elif fase == "Hari ke 2-5 (Penyembuhan)":
-        st.markdown("""<div class="result-box">
-            <h3>🚿 Kebersihan & Aktivitas</h3>
-            <ul>
-                <li>Untuk metode Klem/Stapler, anak diperbolehkan mandi seperti biasa.</li>
-                <li>Bersihkan sisa buang air kecil dengan tissue basah non-alkohol atau kassa.</li>
-                <li>Teteskan minyak antiseptik (jika dibekali) pada ujung penis.</li>
-                <li>Hindari aktivitas berat seperti bersepeda atau melompat berlebihan.</li>
-            </ul>
-        </div>""", unsafe_allow_html=True)
+    if opsi_p == "24 Jam Pertama":
+        st.markdown("<div class='result-box'><b>Fokus:</b> Istirahat total. Berikan obat pereda nyeri tiap 6 jam.</div>", unsafe_allow_html=True)
     else:
-        st.markdown("""<div class="result-box">
-            <h3>🏥 Kontrol & Finalisasi</h3>
-            <p>Datang kembali ke klinik sesuai jadwal kontrol. Untuk metode klem, alat akan dilepas oleh tenaga medis kami. Pastikan luka sudah mengering sempurna sebelum anak kembali berolahraga berat.</p>
-        </div>""", unsafe_allow_html=True)
-
-# --- MENU: TENTANG KAMI (SEJARAH & STRUKTUR) ---
-elif menu == "🏢 Tentang Kami":
-    st.markdown("<h2 class='subheader-style'>Profil Rumah Sunat Anak 🏢</h2>", unsafe_allow_html=True)
-    
-    st.markdown("""<div class="result-box">
-        <p><b>Sejarah & Latar Belakang:</b><br>
-        Rumah Sunat Anak didirikan pada tahun 2015 di bawah naungan Yayasan Medika Nusantara. Berawal dari sebuah klinik kecil, kami melihat tingginya tingkat trauma anak pasca-khitan akibat metode konvensional. 
-        Oleh karena itu, kami bertransformasi menjadi pusat khitan modern yang hanya menggunakan metode bersertifikasi internasional. 
-        Dalam 10 tahun terakhir, kami telah berhasil mengkhitan lebih dari 15.000 anak dari berbagai daerah, menjadikannya salah satu rujukan utama di Indonesia. 
-        Filosofi kami adalah 'Khitan Tanpa Tangis', yang kami wujudkan melalui manajemen nyeri yang komprehensif dan lingkungan klinik yang ramah anak (Playground Area & VR Cinema saat tindakan).</p>
-    </div>""", unsafe_allow_html=True)
-
-    # Struktur Organisasi Luas
-    st.markdown("<h3 style='color:white; text-shadow:1px 1px #000;'>Struktur Organisasi Klinik</h3>", unsafe_allow_html=True)
-    org_data = pd.DataFrame({
-        "Divisi": ["Direktur Utama", "Kepala Medis", "Manajer Operasional", "Humas & Edukasi", "Admin & IT Support", "Kepala Perawat", "Manajemen Fasilitas"],
-        "Nama Pejabat": ["H. Salim Wijaya, M.M", "dr. Ahmad Subarjo", "Rina Kartika, S.E", "Bambang Pamungkas", "Anita Sari, S.Kom", "Ns. Siti Khadijah", "Doni Setiawan"]
-    })
-    st.table(org_data)
-
-    # 8 Dokter Spesialis (Teks Hitam)
-    st.markdown("<h3 style='color:white; text-shadow:1px 1px #000;'>Tim Dokter Spesialis & Tenaga Ahli</h3>", unsafe_allow_html=True)
-    list_dr = []
-    for k, v in data_dokter_lengkap.items():
-        list_dr.append({"Nama Dokter": v['dokter'], "Keahlian Spesifik": v['spesialis']})
-    
-    st.table(pd.DataFrame(list_dr))
-
-    st.info("Seluruh tenaga medis kami telah tersertifikasi oleh Perhimpunan Khitan Indonesia (PKI).")
+        st.markdown("<div class='result-box'><b>Fokus:</b> Jaga kebersihan area. Lakukan aktivitas ringan saja.</div>", unsafe_allow_html=True)
