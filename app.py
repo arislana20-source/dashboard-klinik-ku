@@ -19,14 +19,12 @@ if 'rekomendasi_paket' not in st.session_state:
     st.session_state.rekomendasi_paket = "Sunat Laser (Flashcutter)"
 
 # =================================================================
-# 2. CSS KUSTOM (FIX WARNA & RATA TENGAH)
+# 2. CSS KUSTOM
 # =================================================================
 st.markdown("""
     <style>
-    /* Background Utama */
     .stApp { background-color: #B2AC88; } 
     
-    /* Container Header */
     .header-container {
         text-align: center;
         padding: 30px 10px;
@@ -44,7 +42,6 @@ st.markdown("""
         font-style: italic; margin-top: 15px; display: block; line-height: 1.5;
     }
 
-    /* Rata Tengah Khusus Beranda */
     .center-content {
         text-align: center;
         display: flex;
@@ -53,19 +50,17 @@ st.markdown("""
         justify-content: center;
     }
 
-    /* BOX CARD (Teks Hitam Pekat) */
     .result-box {
         background-color: #F7F9F2; padding: 35px; border-radius: 20px; 
         border: 4px solid #2E473B; margin-top: 15px;
         box-shadow: 8px 8px 0px #2E473B;
-        text-align: left; /* Teks dalam box tetap kiri agar rapi baca list */
+        text-align: left;
     }
     .result-box h3 { color: #2E473B !important; font-weight: 800; margin-bottom: 15px; }
     .result-box p, .result-box b, .result-box li, .result-box span {
         color: #000000 !important; font-size: 18px; line-height: 1.6;
     }
 
-    /* Info Kuota (Ganti Warna Biru yang Buram) */
     .custom-info {
         background-color: #2E473B; color: #F7F9F2;
         padding: 15px; border-radius: 10px; border-left: 10px solid #F7F9F2;
@@ -78,7 +73,6 @@ st.markdown("""
         border-bottom: 5px solid #2E473B; padding-bottom: 5px;
     }
 
-    /* Sidebar & Button */
     [data-testid="stSidebar"] { background-color: #2E473B; }
     .stButton>button {
         background-color: #2E473B !important; color: white !important;
@@ -147,11 +141,16 @@ else:
 # 6. MENU IMPLEMENTATION
 # =================================================================
 
-# --- BERANDA (RATA TENGAH) ---
+# --- BERANDA (FOTO DIEDIT KE TENGAH) ---
 if menu == "🏠 Beranda Utama":
     st.markdown('<div class="center-content">', unsafe_allow_html=True)
     st.markdown("<h2 class='subheader-style'>Selamat Datang di Pusat Khitan Modern</h2>", unsafe_allow_html=True)
-    st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", width=280)
+    
+    # PERUBAHAN DISINI: Menggunakan sistem kolom untuk menengahkan foto dokter
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+        st.image("https://cdn-icons-png.flaticon.com/512/3774/3774299.png", use_container_width=True)
+    
     st.markdown("""
         <div class="result-box" style="text-align: center;">
             <h3>Layanan Khitan Professional & Ramah Anak</h3>
@@ -196,7 +195,6 @@ elif menu == "📝 Pendaftaran Digital":
     st.markdown("<h2 class='subheader-style'>Formulir Pendaftaran Pasien 📝</h2>", unsafe_allow_html=True)
     list_metode = ["Sunat Laser (Flashcutter)", "Sunat Gunting (Konvensional/Bedah)", "Sunat Metode Klem", "Sunat Metode Stapler"]
     
-    # Auto-select based on calculator
     try: idx_pilih = list_metode.index(st.session_state.rekomendasi_paket)
     except: idx_pilih = 0
 
@@ -220,13 +218,12 @@ elif menu == "📝 Pendaftaran Digital":
             else:
                 st.error("Nama pasien tidak boleh kosong!")
 
-# --- MONITORING KUOTA (FIX WARNA INFO) ---
+# --- MONITORING KUOTA ---
 elif menu == "📊 Monitoring Kuota":
     st.markdown("<h2 class='subheader-style'>Status Slot Harian 📊</h2>", unsafe_allow_html=True)
     st.metric("Sisa Kuota Reguler", f"{st.session_state.kuota_reguler} Pasien", "Tersedia")
     st.progress(st.session_state.kuota_reguler * 8)
     
-    # Mengganti st.info biru yang tidak terbaca
     st.markdown(f"""
         <div class="custom-info">
             PEMBERITAHUAN: Saat ini sisa kuota adalah {st.session_state.kuota_reguler} slot. 
@@ -234,16 +231,14 @@ elif menu == "📊 Monitoring Kuota":
         </div>
     """, unsafe_allow_html=True)
 
-# --- PANDUAN PASCA KHITAN (FIX REAKTIVITAS) ---
+# --- PANDUAN PASCA KHITAN ---
 elif menu == "💊 Panduan Pasca-Khitan":
     st.markdown("<h2 class='subheader-style'>Panduan Pemulihan 💊</h2>", unsafe_allow_html=True)
     
-    # Gunakan Key untuk memastikan state berubah saat widget diinteraksi
     opsi_panduan = st.selectbox("Pilih Fase Pemulihan:", 
                                 ["-- Pilih Fase --", "Fase 24 Jam Pertama", "Fase Hari 2 - 5", "Fase Kontrol Akhir"],
                                 key="panduan_selector")
     
-    # Logic reaktif yang langsung berubah saat opsi diganti
     if opsi_panduan == "Fase 24 Jam Pertama":
         st.markdown("""
             <div class="result-box">
@@ -284,20 +279,13 @@ elif menu == "🏢 Profil Lengkap RS":
         <div class="result-box">
             <h3>Sejarah & Komitmen</h3>
             <p>Berdiri sejak tahun 2018, kami berkomitmen menjadi garda terdepan dalam pelayanan sirkumsisi modern. Dengan mengutamakan sterilitas dan pendekatan psikologis 'Ramah Anak', kami telah melayani ribuan pasien dengan tingkat kepuasan tinggi.</p>
-            <ul>
-                <li>Layanan spesialis sunat bayi, anak, dan dewasa.</li>
-                <li>Pusat penanganan sunat gemuk dan revisi sunat.</li>
-                <li>Peralatan medis canggih dan sekali pakai (Single-Use).</li>
-            </ul>
         </div>
     """, unsafe_allow_html=True)
 
-    # Struktur Organisasi (Dibawah Profil)
     st.markdown("<h3 style='color:white; margin-top:30px;'>🏛️ Struktur Manajemen & Organisasi</h3>", unsafe_allow_html=True)
     for kategori, data in struktur_manajemen.items():
         with st.expander(f"Lihat Divisi: {kategori}"):
             st.table(pd.DataFrame(data))
 
-    # Daftar Dokter
     st.markdown("<h3 style='color:white; margin-top:30px;'>👨‍⚕️ Tim Dokter Spesialis Kami</h3>", unsafe_allow_html=True)
     st.table(pd.DataFrame(data_dokter))
